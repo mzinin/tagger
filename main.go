@@ -1,13 +1,14 @@
 package main
 
 import (
-    "tagger/editor"
     "fmt"
     "io/ioutil"
     "log"
     "path/filepath"
     "os"
     "strings"
+
+    "github.com/mzinin/tagger/editor"
 )
 
 func main() {
