@@ -4,15 +4,18 @@ import (
     "bytes"
     "errors"
     "io/ioutil"
+    "os"
     "strconv"
     "strings"
-    "unicode/utf16"
-    "unicode/utf8"
+
+    "github.com/mzinin/tagger/utils"
 )
 
 const (
+    id3v1TagSize int = 128
     id3v2HeaderSize int = 10
     id3v2FrameHeaderSize int = 10
+    id3v2FrameIdSize int = 4
 )
 
 type Mp3TagEditor struct {
@@ -33,14 +36,24 @@ func (editor *Mp3TagEditor) ReadTag(path string) (Tag, error) {
         return Tag{}, errors.New("no ID3 tag")
     }
 
-    aggregateTag(&tag23, tag24)
-    aggregateTag(&tag23, tag10)
+    tag23.MergeWith(tag24)
+    tag23.MergeWith(tag10)
 
     return tag23, nil
 }
 
 func (editor *Mp3TagEditor) WriteTag(src, dst string, tag Tag) error {
-    return nil
+    err := editor.readFile(src)
+    if err != nil {
+        return err
+    }
+
+    existingTagData := findIDv2Data(3, editor.file)
+    soundData := findSoundData(editor.file)
+
+    newTagData := makeNewTagData(existingTagData, tag)
+
+    return ioutil.WriteFile(dst, append(newTagData, soundData ...), os.ModePerm)
 }
 
 func (editor *Mp3TagEditor) readFile(path string) error {
@@ -50,7 +63,7 @@ func (editor *Mp3TagEditor) readFile(path string) error {
 }
 
 func (editor *Mp3TagEditor) parseID3v23Tag() (Tag, error) {
-    tagData := editor.findIDv2Data(3, editor.file)
+    tagData := findIDv2Data(3, editor.file)
     if len(tagData) == 0 {
         return Tag{}, errors.New("no ID3v23 tag")
     }
@@ -61,14 +74,14 @@ func (editor *Mp3TagEditor) parseID3v23Tag() (Tag, error) {
             break
         }
         frameSize := readSize(tagData[4:8])
-        editor.parseID3v2Frame(&tag, frameId, tagData[id3v2FrameHeaderSize:(id3v2FrameHeaderSize + frameSize)])
+        parseID3v2Frame(&tag, frameId, tagData[id3v2FrameHeaderSize:(id3v2FrameHeaderSize + frameSize)])
         tagData = tagData[id3v2FrameHeaderSize + frameSize:]
     }
     return tag, nil
 }
 
 func (editor *Mp3TagEditor) parseID3v24Tag() (Tag, error) {
-    tagData := editor.findIDv2Data(4, editor.file)
+    tagData := findIDv2Data(4, editor.file)
     if len(tagData) == 0 {
         return Tag{}, errors.New("no ID3v24 tag")
     }
@@ -79,71 +92,18 @@ func (editor *Mp3TagEditor) parseID3v24Tag() (Tag, error) {
             break
         }
         frameSize := readSyncSize(tagData[4:8])
-        editor.parseID3v2Frame(&tag, frameId, tagData[id3v2FrameHeaderSize:(id3v2FrameHeaderSize + frameSize)])
+        parseID3v2Frame(&tag, frameId, tagData[id3v2FrameHeaderSize:(id3v2FrameHeaderSize + frameSize)])
         tagData = tagData[id3v2FrameHeaderSize + frameSize:]
     }
     return tag, nil
 }
 
-func (editor *Mp3TagEditor) parseID3v2Frame(tag *Tag, frameId string, frameData []byte) {
-    switch frameId {
-    case "APIC":
-        tag.Cover = readID3v2Cover(frameData)
-    case "COMM":
-        tag.Comment = readID3v2Text(frameData)
-    case "TALB":
-        tag.Album = readID3v2Text(frameData)
-    case "TCON":
-        tag.Genre = readID3v2Text(frameData)
-    case "TIT2":
-        tag.Title = readID3v2Text(frameData)
-    case "TPE1":
-        tag.Artist = readID3v2Text(frameData)
-    case "TRCK":
-        tag.Track, _ = strconv.Atoi(readID3v2Text(frameData))
-    case "TYER":
-        tag.Year, _ = strconv.Atoi(readID3v2Text(frameData))
-    }
-}
-
-func (editor *Mp3TagEditor) findIDv2Data(version byte, data []byte) []byte {
-    if len(data) < id3v2HeaderSize {
-        return nil
-    }
-    if string(data[0:3]) != "ID3" {
-        return nil
-    }
-
-    size := readSyncSize(data[6:10])
-    if len(data) < id3v2HeaderSize + size || size == 0 {
-        return nil
-    }
-
-    // wrong version, continue search
-    if data[3] != version || data[4] != 0 {
-        return editor.findIDv2Data(version, data[(id3v2HeaderSize + size):])
-    }
-
-    // exclude extended header if any
-    extendedHeaderSize := 0
-    if data[5] & 0x40 != 0 {
-        switch version {
-        case 3:
-            extendedHeaderSize = readSize(data[11:15]) + 4
-        case 4:
-            extendedHeaderSize = readSyncSize(data[11:15])
-        }
-    }
-
-    return data[(id3v2HeaderSize + extendedHeaderSize):(id3v2HeaderSize + extendedHeaderSize + size)]
-}
-
 func (editor *Mp3TagEditor) parseID3v10Tag() (Tag, error) {
-    if len(editor.file) < 128 {
+    if len(editor.file) < id3v1TagSize {
         return Tag{}, errors.New("no ID3v10 tag")
     }
 
-    tagData := editor.file[len(editor.file)-128:]
+    tagData := editor.file[len(editor.file)-id3v1TagSize:]
 
     if string(tagData[:3]) != "TAG" {
         return Tag{}, errors.New("no ID3v10 tag")
@@ -169,8 +129,28 @@ func readSize(data []byte) int {
     return ((int(data[0]) * 0x100 + int(data[1])) * 0x100 + int(data[2])) * 0x100 + int(data[3])
 }
 
+func writeSize(size int, dst []byte) {
+    if len(dst) < 4 {
+        return
+    }
+    for i := 3; i >= 0; i-- {
+        dst[i] = byte(size % 0x100)
+        size = size / 0x100
+    }
+}
+
 func readSyncSize(data []byte) int {
     return ((int(data[0]) * 0x80 + int(data[1])) * 0x80 + int(data[2])) * 0x80 + int(data[3])
+}
+
+func writeSyncSize(size int, dst []byte) {
+    if len(dst) < 4 {
+        return
+    }
+    for i := 3; i >= 0; i-- {
+        dst[i] = byte(size % 0x80)
+        size = size / 0x80
+    }
 }
 
 func readID3v2Text(data []byte) string {
@@ -186,41 +166,9 @@ func decodeText(encoding byte, data []byte) string {
     case 0, 3:
         return strings.Trim(string(data), " \x00")
     case 1:
-        if len(data) < 2 {
-            return ""
-        }
-        data = data[2:]
-        if len(data) % 2 != 0 {
-            data = data[:len(data) - 1]
-        }
-        u16slice := make([]uint16, 1)
-        ret := &bytes.Buffer{}
-        b8buffer := make([]byte, 4)
-        for i := 0; i < len(data); i += 2 {
-            u16slice[0] = uint16(data[i]) + (uint16(data[i + 1]) << 8)
-    		runes := utf16.Decode(u16slice)
-            size := utf8.EncodeRune(b8buffer, runes[0])
-    		ret.Write(b8buffer[:size])
-        }
-        return strings.Trim(ret.String(), " \x00")
+        return utils.Utf16LeToUtf8(data)
     case 2:
-        if len(data) < 2 {
-            return ""
-        }
-        data = data[2:]
-        if len(data) % 2 != 0 {
-            data = data[:len(data) - 1]
-        }
-        u16slice := make([]uint16, 1)
-        ret := &bytes.Buffer{}
-        b8buffer := make([]byte, 4)
-        for i := 0; i < len(data); i += 2 {
-            u16slice[0] = uint16(data[i + 1]) + (uint16(data[i]) << 8)
-    		runes := utf16.Decode(u16slice)
-            size := utf8.EncodeRune(b8buffer, runes[0])
-    		ret.Write(b8buffer[:size])
-        }
-        return strings.Trim(ret.String(), " \x00")
+        return utils.Utf16BeToUtf8(data)
     }
     return ""
 }
@@ -255,31 +203,211 @@ func readID3v2Cover(data []byte) Cover {
     return cover
 }
 
-func aggregateTag(dst *Tag, src Tag) {
-    if len(dst.Title) == 0 {
-        dst.Title = src.Title
+func findIDv2Data(version byte, data []byte) []byte {
+    if len(data) < id3v2HeaderSize {
+        return nil
     }
-    if len(dst.Artist) == 0 {
-        dst.Artist = src.Artist
+    if string(data[0:3]) != "ID3" {
+        return nil
     }
-    if len(dst.Album) == 0 {
-        dst.Album = src.Album
+
+    size := readSyncSize(data[6:10])
+    if len(data) < id3v2HeaderSize + size || size == 0 {
+        return nil
     }
-    if dst.Track == 0 {
-        dst.Track = src.Track
+
+    // wrong version, continue search
+    if data[3] != version || data[4] != 0 {
+        return findIDv2Data(version, data[(id3v2HeaderSize + size):])
     }
-    if dst.Year == 0 {
-        dst.Year = src.Year
+
+    // exclude extended header if any
+    extendedHeaderSize := 0
+    if data[5] & 0x40 != 0 {
+        switch version {
+        case 3:
+            extendedHeaderSize = readSize(data[11:15]) + 4
+        case 4:
+            extendedHeaderSize = readSyncSize(data[11:15])
+        }
     }
-    if len(dst.Comment) == 0 {
-        dst.Comment = src.Comment
+
+    return data[(id3v2HeaderSize + extendedHeaderSize):(id3v2HeaderSize + extendedHeaderSize + size)]
+}
+
+func findSoundData(data []byte) []byte {
+    size := len(data)
+    if size < id3v2HeaderSize || string(data[0:3]) != "ID3" {
+        if size < id3v1TagSize || string(data[size - id3v1TagSize : size - id3v1TagSize + 3]) != "TAG" {
+            return data
+        }
+        return data[:size - id3v1TagSize]
     }
-    if len(dst.Genre) == 0 {
-        dst.Genre = src.Genre
+
+    tagSize := readSyncSize(data[6:10])
+    return findSoundData(data[id3v2HeaderSize + tagSize:])
+}
+
+func parseID3v2Frame(tag *Tag, frameId string, frameData []byte) {
+    switch frameId {
+    case "APIC":
+        tag.Cover = readID3v2Cover(frameData)
+    case "COMM":
+        tag.Comment = readID3v2Text(frameData)
+    case "TALB":
+        tag.Album = readID3v2Text(frameData)
+    case "TCON":
+        tag.Genre = readID3v2Text(frameData)
+    case "TIT2":
+        tag.Title = readID3v2Text(frameData)
+    case "TPE1":
+        tag.Artist = readID3v2Text(frameData)
+    case "TRCK":
+        tag.Track, _ = strconv.Atoi(readID3v2Text(frameData))
+    case "TYER":
+        tag.Year, _ = strconv.Atoi(readID3v2Text(frameData))
     }
-    if dst.Cover.Empty() {
-        dst.Cover = src.Cover
+}
+
+func makeNewTagData(existingTagData []byte, tag Tag) []byte {
+    newTags := serializeTag(tag)
+    oldTags := extractUnsupportedTags(existingTagData)
+    header := makeIdv23TagHeader(len(newTags) + len(oldTags))
+    return append(append(header, newTags ...), oldTags ...)
+}
+
+func extractUnsupportedTags(existingTagData []byte) []byte {
+    result := make([]byte, len(existingTagData))
+    size := 0
+
+    for len(existingTagData) > id3v2FrameHeaderSize {
+        frameId := string(existingTagData[0:4])
+        frameSize := readSize(existingTagData[4:8])
+
+        stop := false
+        switch frameId {
+        case "\x00\x00\x00\x00":
+            stop = true
+        case "APIC", "COMM", "TALB", "TCON", "TIT2", "TPE1", "TRCK", "TYER":
+            break
+        default:
+            copy(result[size : size + id3v2FrameHeaderSize + frameSize], existingTagData[:id3v2FrameHeaderSize + frameSize])
+        }
+
+        if stop {
+            break
+        }
+
+        existingTagData = existingTagData[id3v2FrameHeaderSize + frameSize:]
     }
+
+    return result[:size]
+}
+
+func serializeTag(tag Tag) []byte {
+    // 256 bytes for possible overhead
+    result := make([]byte, tag.Size() + 256)
+    size := 0
+    
+    if len(tag.Title) != 0 {
+        size = serializeTextFrame(tag.Title, "TIT2", result, size)
+    }
+    if len(tag.Artist) != 0 {
+        size = serializeTextFrame(tag.Artist, "TPE1", result, size)
+    }
+    if len(tag.Album) != 0 {
+        size = serializeTextFrame(tag.Album, "TALB", result, size)
+    }
+    if tag.Track != 0 {
+        size = serializeTextFrame(strconv.Itoa(tag.Track), "TRCK", result, size)
+    }
+    if tag.Year != 0 {
+        size = serializeTextFrame(strconv.Itoa(tag.Year), "TYER", result, size)
+    }
+    if len(tag.Comment) != 0 {
+        size = serializeTextFrame(tag.Comment, "COMM", result, size)
+    }
+    if len(tag.Genre) != 0 {
+        size = serializeTextFrame(tag.Genre, "TCON", result, size)
+    }
+    if !tag.Cover.Empty() {
+        size = serializeCover(tag.Cover, "APIC", result, size)
+    }
+
+    return result[:size]
+}
+
+func serializeTextFrame(text, frameId string, dst []byte, offset int) int {
+    if len(frameId) != id3v2FrameIdSize {
+        return offset
+    }
+
+    utf16Text := utils.Utf8ToUtf16Le(text)
+    copy(dst[offset:], frameId)
+    writeSize(len(utf16Text) + 3, dst[offset+4 : offset+8])
+    dst[offset+8] = 0 // flag
+    dst[offset+9] = 0 // flag
+    dst[offset+10] = 1 // text encoding
+    dst[offset+11] = 0xFF // UTF BOM
+    dst[offset+12] = 0xFE // UTF BOM
+    copy(dst[offset+13 : offset+13+len(utf16Text)], utf16Text)
+    return offset + 13 + len(utf16Text)
+}
+
+func serializeCover(cover Cover, frameId string, dst []byte, offset int) int {
+    if len(frameId) != id3v2FrameIdSize {
+        return offset
+    }
+
+    data := coverToData(cover)
+    copy(dst[offset:], frameId)
+    writeSize(len(data), dst[offset+4 : offset+8])
+    dst[offset+8] = 0 // flag
+    dst[offset+9] = 0 // flag
+    copy(dst[offset+10 : offset+10+len(data)], data)
+
+    return offset + 10 + len(data)
+}
+
+func coverToData(cover Cover) []byte {
+    result := make([]byte, cover.Size() + 128)
+    size := 0
+
+    result[0] = 0 // encoding
+    size++
+
+    copy(result[size : size + len(cover.Mime)], cover.Mime)
+    size += len(cover.Mime)
+
+    result[size] = 0
+    size++
+
+    // TODO care for cover type
+    result[size] = 3 // cover type
+    size++
+
+    copy(result[size : size + len(cover.Description)], cover.Description)
+    size += len(cover.Description)
+
+    result[size] = 0
+    size++
+
+    copy(result[size : size + len(cover.Data)], cover.Data)
+    size += len(cover.Data)
+
+    return result[:size]
+}
+
+func makeIdv23TagHeader(size int) []byte {
+    header := make([]byte, id3v2HeaderSize)
+    header[0] = 0x49 // I
+    header[1] = 0x44 // D
+    header[2] = 0x33 // 3
+    header[3] = 0x03
+    header[4] = 0x00
+    header[5] = 0x00
+    writeSyncSize(size, header[6:id3v2HeaderSize])
+    return header
 }
 
 var genreCodeToString = map[int]string {

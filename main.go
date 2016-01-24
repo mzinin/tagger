@@ -19,17 +19,38 @@ func main() {
         path = "D:\\projects\\Go\\bin\\barefoot.mp3"
     }
 
-    editor := editor.NewEditor(editor.Mp3)
-    tag, err := editor.ReadTag(path)
+    // read tag
+    editorObject := editor.NewEditor(editor.Mp3)
+    tag, err := editorObject.ReadTag(path)
     if err != nil {
         log.Fatal(err)
         return
     }
-
+    
+    // print tag
     fmt.Println("File: ", path)
     fmt.Println(tag)
-
     save(tag.Cover, "read_cover.jpg")
+
+    // make new tag
+    var newTag editor.Tag
+    newTag.Title = "Some new title"
+    newTag.Artist = "Some new artist"
+    newTag.Album = "Some new album"
+    newTag.Track = 56
+    newTag.Year = 2001
+    newTag.Comment = "Here is the comment!"
+    newTag.Genre = "My own genre"
+    newTag.Cover.Mime = "image/png"
+    newTag.Cover.Description = "a bit of description"
+    newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\317.png")
+
+    // write new tag
+    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.mp3", newTag)
+    if err != nil {
+        log.Fatal(err)
+        return
+    }
 }
 
 func save(cover editor.Cover, path string) error {

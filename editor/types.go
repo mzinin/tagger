@@ -2,6 +2,7 @@ package editor
 
 
 import (
+    "math"
     "strconv"
 )
 
@@ -27,6 +28,17 @@ func (tag Tag) String() string {
            "Cover: " + tag.Cover.String()
 }
 
+func (tag Tag) Size() int {
+    return len(tag.Title) +
+           len(tag.Artist) +
+           len(tag.Album) +
+           int(math.Log10(float64(tag.Track))) +
+           int(math.Log10(float64(tag.Year))) + 
+           len(tag.Comment) +
+           len(tag.Genre) +
+           tag.Cover.Size()
+}
+
 func (tag Tag) Empty() bool {
     return len(tag.Title) == 0 &&
            len(tag.Artist) == 0 &&
@@ -35,6 +47,33 @@ func (tag Tag) Empty() bool {
            len(tag.Comment) == 0 &&
            len(tag.Genre) == 0 &&
            tag.Cover.Empty()
+}
+
+func (tag *Tag) MergeWith(src Tag) {
+    if len(tag.Title) == 0 {
+        tag.Title = src.Title
+    }
+    if len(tag.Artist) == 0 {
+        tag.Artist = src.Artist
+    }
+    if len(tag.Album) == 0 {
+        tag.Album = src.Album
+    }
+    if tag.Track == 0 {
+        tag.Track = src.Track
+    }
+    if tag.Year == 0 {
+        tag.Year = src.Year
+    }
+    if len(tag.Comment) == 0 {
+        tag.Comment = src.Comment
+    }
+    if len(tag.Genre) == 0 {
+        tag.Genre = src.Genre
+    }
+    if tag.Cover.Empty() {
+        tag.Cover = src.Cover
+    }
 }
 
 type Cover struct {
@@ -50,9 +89,10 @@ func (cover Cover) String() string {
            "Description: " + cover.Description
 }
 
+func (cover Cover) Size() int {
+    return len(cover.Mime) + len(cover.Type) + len(cover.Description) + len(cover.Data)
+}
+
 func (cover Cover) Empty() bool {
-    return len(cover.Mime) == 0 &&
-           len(cover.Type) == 0 &&
-           len(cover.Description) == 0 &&
-           len(cover.Data) == 0
+    return cover.Size() == 0
 }
