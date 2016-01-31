@@ -73,7 +73,7 @@ func (editor *Mp3TagEditor) parseID3v23Tag() (Tag, error) {
         if frameId == "\x00\x00\x00\x00" {
             break
         }
-        frameSize := readSize(tagData[4:8])
+        frameSize := utils.ReadInt32Be(tagData[4:8])
         parseID3v2Frame(&tag, frameId, tagData[id3v2FrameHeaderSize:(id3v2FrameHeaderSize + frameSize)])
         tagData = tagData[id3v2FrameHeaderSize + frameSize:]
     }
@@ -91,7 +91,7 @@ func (editor *Mp3TagEditor) parseID3v24Tag() (Tag, error) {
         if frameId == "\x00\x00\x00\x00" {
             break
         }
-        frameSize := readSyncSize(tagData[4:8])
+        frameSize := readSyncInt32Be(tagData[4:8])
         parseID3v2Frame(&tag, frameId, tagData[id3v2FrameHeaderSize:(id3v2FrameHeaderSize + frameSize)])
         tagData = tagData[id3v2FrameHeaderSize + frameSize:]
     }
@@ -125,25 +125,11 @@ func (editor *Mp3TagEditor) parseID3v10Tag() (Tag, error) {
     return tag, nil
 }
 
-func readSize(data []byte) int {
-    return ((int(data[0]) * 0x100 + int(data[1])) * 0x100 + int(data[2])) * 0x100 + int(data[3])
-}
-
-func writeSize(size int, dst []byte) {
-    if len(dst) < 4 {
-        return
-    }
-    for i := 3; i >= 0; i-- {
-        dst[i] = byte(size % 0x100)
-        size = size / 0x100
-    }
-}
-
-func readSyncSize(data []byte) int {
+func readSyncInt32Be(data []byte) int {
     return ((int(data[0]) * 0x80 + int(data[1])) * 0x80 + int(data[2])) * 0x80 + int(data[3])
 }
 
-func writeSyncSize(size int, dst []byte) {
+func writeSyncInt32Be(size int, dst []byte) {
     if len(dst) < 4 {
         return
     }
@@ -211,7 +197,7 @@ func findIDv2Data(version byte, data []byte) []byte {
         return nil
     }
 
-    size := readSyncSize(data[6:10])
+    size := readSyncInt32Be(data[6:10])
     if len(data) < id3v2HeaderSize + size || size == 0 {
         return nil
     }
@@ -226,9 +212,9 @@ func findIDv2Data(version byte, data []byte) []byte {
     if data[5] & 0x40 != 0 {
         switch version {
         case 3:
-            extendedHeaderSize = readSize(data[11:15]) + 4
+            extendedHeaderSize = utils.ReadInt32Be(data[11:15]) + 4
         case 4:
-            extendedHeaderSize = readSyncSize(data[11:15])
+            extendedHeaderSize = readSyncInt32Be(data[11:15])
         }
     }
 
@@ -244,7 +230,7 @@ func findSoundData(data []byte) []byte {
         return data[:size - id3v1TagSize]
     }
 
-    tagSize := readSyncSize(data[6:10])
+    tagSize := readSyncInt32Be(data[6:10])
     return findSoundData(data[id3v2HeaderSize + tagSize:])
 }
 
@@ -282,7 +268,7 @@ func extractUnsupportedTags(existingTagData []byte) []byte {
 
     for len(existingTagData) > id3v2FrameHeaderSize {
         frameId := string(existingTagData[0:4])
-        frameSize := readSize(existingTagData[4:8])
+        frameSize := utils.ReadInt32Be(existingTagData[4:8])
 
         stop := false
         switch frameId {
@@ -344,7 +330,7 @@ func serializeTextFrame(text, frameId string, dst []byte, offset int) int {
 
     utf16Text := utils.Utf8ToUtf16Le(text)
     copy(dst[offset:], frameId)
-    writeSize(len(utf16Text) + 3, dst[offset+4 : offset+8])
+    utils.WriteInt32Be(len(utf16Text) + 3, dst[offset+4 : offset+8])
     dst[offset+8] = 0 // flag
     dst[offset+9] = 0 // flag
     dst[offset+10] = 1 // text encoding
@@ -361,7 +347,7 @@ func serializeCover(cover Cover, frameId string, dst []byte, offset int) int {
 
     data := coverToData(cover)
     copy(dst[offset:], frameId)
-    writeSize(len(data), dst[offset+4 : offset+8])
+    utils.WriteInt32Be(len(data), dst[offset+4 : offset+8])
     dst[offset+8] = 0 // flag
     dst[offset+9] = 0 // flag
     copy(dst[offset+10 : offset+10+len(data)], data)
@@ -406,7 +392,7 @@ func makeIdv23TagHeader(size int) []byte {
     header[3] = 0x03
     header[4] = 0x00
     header[5] = 0x00
-    writeSyncSize(size, header[6:id3v2HeaderSize])
+    writeSyncInt32Be(size, header[6:id3v2HeaderSize])
     return header
 }
 

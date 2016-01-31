@@ -16,11 +16,11 @@ func main() {
     if len(os.Args) > 1 {
         path = os.Args[1]
     } else {
-        path = "D:\\projects\\Go\\bin\\barefoot.mp3"
+        path = "D:\\projects\\Go\\bin\\barefoot.ogg"
     }
 
     // read tag
-    editorObject := editor.NewEditor(editor.Mp3)
+    editorObject := editor.NewEditor(editor.Ogg)
     tag, err := editorObject.ReadTag(path)
     if err != nil {
         log.Fatal(err)
@@ -46,11 +46,11 @@ func main() {
     newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\317.png")
 
     // write new tag
-    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.mp3", newTag)
-    if err != nil {
-        log.Fatal(err)
-        return
-    }
+    //err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.mp3", newTag)
+    //if err != nil {
+    //    log.Fatal(err)
+    //    return
+    //}
 }
 
 func save(cover editor.Cover, path string) error {
