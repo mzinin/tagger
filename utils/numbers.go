@@ -19,3 +19,32 @@ func WriteInt32Be(size int, dst []byte) {
     }
 }
 
+func WriteUint32Be(size uint32, dst []byte) {
+    if len(dst) < 4 {
+        return
+    }
+    for i := 3; i >= 0; i-- {
+        dst[i] = byte(size % 0x100)
+        size = size / 0x100
+    }
+}
+
+func WriteInt32Le(size int, dst []byte) {
+    if len(dst) < 4 {
+        return
+    }
+    for i := 0; i < 4; i++ {
+        dst[i] = byte(size % 0x100)
+        size = size / 0x100
+    }
+}
+
+func WriteUint32Le(size uint32, dst []byte) {
+    if len(dst) < 4 {
+        return
+    }
+    for i := 0; i < 4; i++ {
+        dst[i] = byte(size % 0x100)
+        size = size / 0x100
+    }
+}

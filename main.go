@@ -41,16 +41,16 @@ func main() {
     newTag.Year = 2001
     newTag.Comment = "Here is the comment!"
     newTag.Genre = "My own genre"
-    newTag.Cover.Mime = "image/png"
-    newTag.Cover.Description = "a bit of description"
-    newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\317.png")
+    //newTag.Cover.Mime = "image/png"
+    //newTag.Cover.Description = "a bit of description"
+    //newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\317.png")
 
     // write new tag
-    //err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.mp3", newTag)
-    //if err != nil {
-    //    log.Fatal(err)
-    //    return
-    //}
+    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.ogg", newTag)
+    if err != nil {
+        log.Fatal(err)
+        return
+    }
 }
 
 func save(cover editor.Cover, path string) error {

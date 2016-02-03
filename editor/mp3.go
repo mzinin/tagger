@@ -257,12 +257,12 @@ func parseID3v2Frame(tag *Tag, frameId string, frameData []byte) {
 
 func makeNewTagData(existingTagData []byte, tag Tag) []byte {
     newTags := serializeTag(tag)
-    oldTags := extractUnsupportedTags(existingTagData)
+    oldTags := extractUnsupportedID3v2Tags(existingTagData)
     header := makeIdv23TagHeader(len(newTags) + len(oldTags))
     return append(append(header, newTags ...), oldTags ...)
 }
 
-func extractUnsupportedTags(existingTagData []byte) []byte {
+func extractUnsupportedID3v2Tags(existingTagData []byte) []byte {
     result := make([]byte, len(existingTagData))
     size := 0
 
@@ -278,6 +278,7 @@ func extractUnsupportedTags(existingTagData []byte) []byte {
             break
         default:
             copy(result[size : size + id3v2FrameHeaderSize + frameSize], existingTagData[:id3v2FrameHeaderSize + frameSize])
+            size += id3v2FrameHeaderSize + frameSize
         }
 
         if stop {
