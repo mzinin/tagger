@@ -9,8 +9,6 @@ import (
     "strconv"
     "strings"
 
-    //"fmt"
-
     "github.com/mzinin/tagger/utils"
 )
 
@@ -38,7 +36,9 @@ func (editor *OggTagEditor) ReadTag(path string) (Tag, error) {
     }
 
     _, tagData, _ := splitCommentPages(commentPages)
-    return parseTagData(tagData)
+
+    var tag Tag
+    return tag, parseVorbisTags(tagData, &tag)
 }
 
 func (editor *OggTagEditor) WriteTag(src, dst string, tag Tag) error {
@@ -151,78 +151,6 @@ func splitCommentPages(pages []byte) ([]byte, []byte, []byte) {
     }
 
     return commentHeader, tagData, setupHeader
-}
-
-func parseTagData(data []byte) (Tag, error) {
-    numberOfFields := utils.ReadInt32Le(data[0 : 4])
-    data = data[4:]
-
-    var tag Tag
-    for i := 0; i < numberOfFields; i++ {
-        fieldSize := utils.ReadInt32Le(data[0 : 4])
-        if fieldSize + 4 <= len(data) {
-            parseTagField(data[4 : 4 + fieldSize], &tag)
-            data = data[4 + fieldSize:]
-        }
-    }
-
-    return tag, nil
-}
-
-func parseTagField(data []byte, tag *Tag) {
-    // search symbol '='
-    pos := bytes.IndexByte(data, 0x3d)
-    if pos == -1 {
-        return
-    }
-
-    fieldName := strings.ToUpper(string(data[:pos]))
-    fieldValue := string(data[pos + 1:])
-
-    switch fieldName {
-    case "TITLE":
-        tag.Title = fieldValue
-    case "ARTIST":
-        tag.Artist = fieldValue
-    case "ALBUM":
-        tag.Album = fieldValue
-    case "TRACKNUMBER":
-        tag.Track, _ = strconv.Atoi(fieldValue)
-    case "DATE":
-        tag.Year, _ = strconv.Atoi(fieldValue)
-    case "GENRE":
-        tag.Genre = fieldValue
-    case "METADATA_BLOCK_PICTURE":
-        tag.Cover = parseCoverTagField(fieldValue)
-    }
-}
-
-func parseCoverTagField(encoded string) Cover {
-    var cover Cover
-
-    data, err := base64.StdEncoding.DecodeString(encoded)
-    if err != nil || len(data) < 8 {
-        return cover
-    }
-
-    cover.Type = imageType[byte(utils.ReadInt32Be(data[0 : 4]))]
-
-    mimeTypeSize := utils.ReadInt32Be(data[4 : 8])
-    if len(data) < 8 + mimeTypeSize + 4 {
-        return cover
-    }
-    cover.Mime = string(data[8 : 8 + mimeTypeSize])
-
-    descriptionSize := utils.ReadInt32Be(data[8 + mimeTypeSize : 8 + mimeTypeSize + 4])
-    if len(data) < 8 + mimeTypeSize + 4 + descriptionSize + 20 {
-        return cover
-    }
-    cover.Description = string(data[8 + mimeTypeSize + 4 : 8 + mimeTypeSize + 4 + descriptionSize])
-
-    cover.Data = make([]byte, len(data) - (8 + mimeTypeSize + 4 + descriptionSize + 20))
-    copy(cover.Data, data[8 + mimeTypeSize + 4 + descriptionSize + 20:])
-
-    return cover
 }
 
 func makeNewPages(existingCommentPages []byte, tag Tag) ([]byte, []byte, int) {

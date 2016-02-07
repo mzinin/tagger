@@ -425,11 +425,3 @@ var genreCodeToString = map[int]string {
     121: "Punk Rock", 122: "Drum Solo", 123: "A Capela", 124: "Euro-House", 125: "Dance Hall",
     126: "Unknown", 127: "Unknown",
 }
-
-var imageType = map[byte]string {
-    0: "Other", 1:  "32x32 file icon", 2: "Other file icon", 3: "Cover (front)", 4: "Cover (back)",
-    5: "Leaflet page", 6: "Media", 7: "Lead artist/lead performer/soloist", 8: "Artist/performer",  9: "Conductor",
-    10: "Band/Orchestra", 11: "Composer", 12: "Lyricist/text writer", 13: "Recording Location", 14: "During recording",
-    15: "During performance", 16: "Movie/video screen capture", 17: "A bright coloured fish", 18: "Illustration", 19: "Band/artist logotype",
-    20: "Publisher/Studio logotype",
-}

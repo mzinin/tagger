@@ -20,6 +20,8 @@ func NewEditor(editorType EditorType) Editor {
         return &Mp3TagEditor{}
     case Ogg:
         return &OggTagEditor{}
+    case Flac:
+        return &FlacTagEditor{}
     }
     return nil
 }

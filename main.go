@@ -33,20 +33,20 @@ func main() {
     save(tag.Cover, "read_cover.jpg")
 
     // make new tag
-    var newTag editor.Tag
-    newTag.Title = "Some new title"
-    newTag.Artist = "Some new artist"
-    newTag.Album = "Some new album"
-    newTag.Track = 56
-    newTag.Year = 2001
-    newTag.Comment = "Here is the comment!"
-    newTag.Genre = "My own genre"
+    //var newTag editor.Tag
+    //newTag.Title = "Some new title"
+    //newTag.Artist = "Some new artist"
+    //newTag.Album = "Some new album"
+    //newTag.Track = 56
+    //newTag.Year = 2001
+    //newTag.Comment = "Here is the comment!"
+    //newTag.Genre = "My own genre"
     //newTag.Cover.Mime = "image/png"
     //newTag.Cover.Description = "a bit of description"
     //newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\317.png")
 
     // write new tag
-    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.ogg", newTag)
+    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.ogg", tag)
     if err != nil {
         log.Fatal(err)
         return

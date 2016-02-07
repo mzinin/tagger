@@ -48,3 +48,24 @@ func WriteUint32Le(size uint32, dst []byte) {
         size = size / 0x100
     }
 }
+
+func ReadInt24Be(data []byte) int {
+    return (int(data[0]) * 0x100 + int(data[1])) * 0x100 + int(data[2])
+}
+
+func WriteInt24Be(size int, dst []byte) {
+    if len(dst) < 3 {
+        return
+    }
+    for i := 2; i >= 0; i-- {
+        dst[i] = byte(size % 0x100)
+        size = size / 0x100
+    }
+}
+
+func Min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
+}
