@@ -62,10 +62,3 @@ func WriteInt24Be(size int, dst []byte) {
         size = size / 0x100
     }
 }
-
-func Min(a, b int) int {
-    if a < b {
-        return a
-    }
-    return b
-}

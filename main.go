@@ -16,11 +16,11 @@ func main() {
     if len(os.Args) > 1 {
         path = os.Args[1]
     } else {
-        path = "D:\\projects\\Go\\bin\\barefoot.ogg"
+        path = "D:\\projects\\Go\\bin\\loser.flac"
     }
 
     // read tag
-    editorObject := editor.NewEditor(editor.Ogg)
+    editorObject := editor.NewEditor(editor.Flac)
     tag, err := editorObject.ReadTag(path)
     if err != nil {
         log.Fatal(err)
@@ -33,20 +33,20 @@ func main() {
     save(tag.Cover, "read_cover.jpg")
 
     // make new tag
-    //var newTag editor.Tag
-    //newTag.Title = "Some new title"
-    //newTag.Artist = "Some new artist"
-    //newTag.Album = "Some new album"
-    //newTag.Track = 56
-    //newTag.Year = 2001
-    //newTag.Comment = "Here is the comment!"
-    //newTag.Genre = "My own genre"
-    //newTag.Cover.Mime = "image/png"
-    //newTag.Cover.Description = "a bit of description"
-    //newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\317.png")
+    var newTag editor.Tag
+    newTag.Title = "Some new title"
+    newTag.Artist = "Some new artist"
+    newTag.Album = "Some new album"
+    newTag.Track = 56
+    newTag.Year = 2001
+    newTag.Comment = "Here is the comment!"
+    newTag.Genre = "My own genre"
+    newTag.Cover.Mime = "image/jpg"
+    newTag.Cover.Description = "a bit of description"
+    newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\comix_15.jpg")
 
     // write new tag
-    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.ogg", tag)
+    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.flac", newTag)
     if err != nil {
         log.Fatal(err)
         return

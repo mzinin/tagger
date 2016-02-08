@@ -2,12 +2,9 @@ package editor
 
 import (
     "bytes"
-    "encoding/base64"
     "errors"
     "io/ioutil"
     "os"
-    "strconv"
-    "strings"
 
     "github.com/mzinin/tagger/utils"
 )
@@ -168,8 +165,8 @@ func makeNewPages(existingCommentPages []byte, tag Tag) ([]byte, []byte, int) {
         utils.WriteInt32Le(0, commentHeader[len(oggHeaderMagic) : len(oggHeaderMagic) + 4])
     }
 
-    unsupportedTagData, unsupportedFields := extractUnsupportedOggTags(existingTagData)
-    newTagData, totalFields := serializeOggTag(tag, unsupportedFields)
+    unsupportedTagData, unsupportedFields := getUnsupportedVorbisTags(existingTagData)
+    newTagData, totalFields := serializeVorbisTag(tag, unsupportedFields)
 
     tagData := make([]byte, len(commentHeader) + 4 + len(newTagData) + len(unsupportedTagData) + 1)
     copy(tagData, commentHeader)
@@ -182,127 +179,6 @@ func makeNewPages(existingCommentPages []byte, tag Tag) ([]byte, []byte, int) {
     newSetupHeader, setupPages := packTagsToOggFrame(bitstream, commentPages + 1, setupHeader)
 
     return newCommentHeader, newSetupHeader, commentPages + setupPages
-}
-
-func extractUnsupportedOggTags(existingTagData []byte) ([]byte, int) {
-    result := make([]byte, len(existingTagData))
-    fields := 0
-    size := 0
-
-    numberOfFields := utils.ReadInt32Le(existingTagData[0 : 4])
-    existingTagData = existingTagData[4:]
-
-    for i := 0; i < numberOfFields; i++ {
-        fieldSize := utils.ReadInt32Le(existingTagData[0 : 4])
-        if len(existingTagData) < fieldSize + 4 {
-            break;
-        }
-            
-        pos := bytes.IndexByte(existingTagData[4 : 4 + fieldSize], 0x3d)
-        if pos == -1 {
-            break;
-        }
-
-        fieldName := strings.ToUpper(string(existingTagData[4 : 4 + pos]))
-        switch fieldName {
-        case "TITLE", "ARTIST", "ALBUM", "TRACKNUMBER", "DATE", "GENRE", "METADATA_BLOCK_PICTURE":
-            break
-        default:
-            copy(result[size : size + 4 + fieldSize], existingTagData[: 4 + fieldSize])
-            fields++
-            size += 4 + fieldSize
-        }
-
-        existingTagData = existingTagData[4 + fieldSize:]
-    }
-
-    return result[:size], fields
-}
-
-func serializeOggTag(tag Tag, additionalFields int) ([]byte, int) {
-    // 256 bytes for possible overhead, 2* - for base64 cover encoding
-    result := make([]byte, 2*tag.Size() + 256)
-    size := 0
-    
-    if len(tag.Title) != 0 {
-        size = serializeOggTextFrame(tag.Title, "TITLE", result, size)
-        additionalFields++
-    }
-    if len(tag.Artist) != 0 {
-        size = serializeOggTextFrame(tag.Artist, "ARTIST", result, size)
-        additionalFields++
-    }
-    if len(tag.Album) != 0 {
-        size = serializeOggTextFrame(tag.Album, "ALBUM", result, size)
-        additionalFields++
-    }
-    if tag.Track != 0 {
-        size = serializeOggTextFrame(strconv.Itoa(tag.Track), "TRACKNUMBER", result, size)
-        additionalFields++
-    }
-    if tag.Year != 0 {
-        size = serializeOggTextFrame(strconv.Itoa(tag.Year), "DATE", result, size)
-        additionalFields++
-    }
-    if len(tag.Genre) != 0 {
-        size = serializeOggTextFrame(tag.Genre, "GENRE", result, size)
-        additionalFields++
-    }
-    if !tag.Cover.Empty() {
-        data := coverToOggData(tag.Cover)
-        size = serializeOggTextFrame(data, "METADATA_BLOCK_PICTURE", result, size)
-        additionalFields++
-    }
-
-    // empty tag is not allowed
-    if additionalFields == 0 {
-        size = serializeOggTextFrame("", "LYRICS", result, size)
-        additionalFields++
-    }
-
-    return result[:size], additionalFields
-}
-
-func serializeOggTextFrame(text, frameName string, dst []byte, offset int) int {
-    fieldSize := len(frameName) + len(text) + 1
-    utils.WriteInt32Le(fieldSize, dst[offset : offset + 4])
-    copy(dst[offset + 4 : offset + 4 + len(frameName)], frameName)
-    dst[offset + 4 + len(frameName)] = 0x3d // '='
-    copy(dst[offset + 5 + len(frameName) : offset + 4 + fieldSize], text)
-    return offset + 4 + fieldSize
-}
-
-func coverToOggData(cover Cover) string {
-    result := make([]byte, cover.Size() + 128)
-    size := 0
-
-    // cover type
-    // TODO care for cover type
-    utils.WriteInt32Be(3, result[0 : 4])
-    size += 4
-
-    // mime
-    utils.WriteInt32Be(len(cover.Mime), result[size : size + 4])
-    copy(result[size + 4 : size + 4 + len(cover.Mime)], cover.Mime)
-    size += 4 + len(cover.Mime)
-
-    // description
-    utils.WriteInt32Be(len(cover.Description), result[size : size + 4])
-    copy(result[size + 4 : size + 4 + len(cover.Description)], cover.Description)
-    size += 4 + len(cover.Description)
-
-    // width, height, colour depth, colours
-    for i := size; i < size + 16; i++ {
-        result[i] = 0
-    }
-    size += 16
-
-    // image data
-    utils.WriteInt32Be(len(cover.Data), result[size : size + 4])
-    copy(result[size + 4 : size + 4 + len(cover.Data)], cover.Data)
-    size += 4 + len(cover.Data)
-
-    return base64.StdEncoding.EncodeToString(result[:size])
 }
 
 func packTagsToOggFrame(bitstream, sequence int, tagData []byte) ([]byte, int) {

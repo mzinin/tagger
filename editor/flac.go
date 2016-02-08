@@ -1,14 +1,9 @@
 package editor
 
 import (
-    //"bytes"
     "errors"
     "io/ioutil"
-    //"os"
-    //"strconv"
-    //"strings"
-
-    //"fmt"
+    "os"
 
     "github.com/mzinin/tagger/utils"
 )
@@ -44,7 +39,33 @@ func (editor *FlacTagEditor) ReadTag(path string) (Tag, error) {
 }
 
 func (editor *FlacTagEditor) WriteTag(src, dst string, tag Tag) error {
-    return nil
+    err := editor.readFile(src)
+    if err != nil {
+        return err
+    }
+
+    commentBlock, pictureBlock, prefix, infix, suffix := editor.splitFileData()
+
+    cover := tag.Cover
+    tag.Cover = Cover{}
+    newCommentBlock := editor.makeNewCommentBlock(tag, commentBlock)
+    newPictureBlock := editor.makeNewPictureBlock(cover)
+
+    // set last meta block flag on new picture block if nessesary
+    if editor.findAndRemoveLastMetaBlockFlag(commentBlock) ||
+       editor.findAndRemoveLastMetaBlockFlag(pictureBlock) ||
+       editor.findAndRemoveLastMetaBlockFlag(prefix[len(flacHeaderMagic):]) {
+        newPictureBlock[0] |= lastMetaBlockFlag
+    }
+
+    newData := make([]byte, len(prefix) + len(newCommentBlock) + len(newPictureBlock) + len(infix) + len(suffix))
+    copy(newData, prefix)
+    copy(newData[len(prefix):], newCommentBlock)
+    copy(newData[len(prefix) + len(newCommentBlock):], newPictureBlock)
+    copy(newData[len(prefix) + len(newCommentBlock) + len(newPictureBlock):], infix)
+    copy(newData[len(prefix) + len(newCommentBlock) + len(newPictureBlock) + len(infix):], suffix)
+
+    return ioutil.WriteFile(dst, newData, os.ModePerm)
 }
 
 func (editor *FlacTagEditor) readFile(path string) error {
@@ -122,7 +143,7 @@ func (editor *FlacTagEditor) getSizesAndPositions() (int, int, int, int) {
 }
 
 func (editor *FlacTagEditor) parseCommentBlock(data []byte, tag *Tag) error {
-    if len(data) == 0 {
+    if len(data) < 8 {
         return errors.New("no flac comment block to parse")
     }
 
@@ -135,5 +156,54 @@ func (editor *FlacTagEditor) parsePictureBlock(data []byte, cover *Cover) error 
         return errors.New("no flac picture block to parse")
     }
 
-    return parseVorbisPictureTag(data[4:], cover)
+    return parseVorbisTagPictureField(data[4:], cover)
+}
+
+func (editor *FlacTagEditor) makeNewCommentBlock(tag Tag, existingCommentBlock []byte) []byte {
+    var vendorData []byte = nil
+    var unsupportedTagData []byte = nil
+    var unsupportedFields int = 0
+
+    if len(existingCommentBlock) >= 8 {
+        vendorSize := utils.ReadInt32Le(existingCommentBlock[4:8])
+        vendorData = existingCommentBlock[4 : 8 + vendorSize]
+        unsupportedTagData, unsupportedFields = getUnsupportedVorbisTags(existingCommentBlock[8 + vendorSize:])
+    }
+
+    newCommentData, totalFields := serializeVorbisTag(tag, unsupportedFields)
+
+    newCommentBlock := make([]byte, 4 + len(vendorData) + 4 + len(newCommentData) + len(unsupportedTagData))
+    newCommentBlock[0] = commentBlockType
+    utils.WriteInt24Be(len(newCommentBlock) - 4, newCommentBlock[1:4])
+    copy(newCommentBlock[4:], vendorData)
+    utils.WriteInt32Le(totalFields, newCommentBlock[4 + len(vendorData) : 8 + len(vendorData)])
+    copy(newCommentBlock[8 + len(vendorData):], newCommentData)
+    copy(newCommentBlock[8 + len(vendorData) + len(newCommentData):], unsupportedTagData)
+
+    return newCommentBlock
+}
+
+func (editor *FlacTagEditor) makeNewPictureBlock(cover Cover) []byte {
+    if cover.Empty() {
+        return nil
+    }
+
+    pictureData := serializeVorbisTagPictureField(cover)
+
+    typeData := make([]byte, 4)
+    typeData[0] = pictureBlockType
+    utils.WriteInt24Be(len(pictureData), typeData[1:4])
+
+    return append(typeData, pictureData ...)
+}
+
+func (editor *FlacTagEditor) findAndRemoveLastMetaBlockFlag(blocks []byte) bool {
+    for len(blocks) > 3 {
+        if blocks[0] & lastMetaBlockFlag == lastMetaBlockFlag {
+            return true
+        }
+        blockSize := utils.ReadInt24Be(blocks[1:4]) + 4
+        blocks = blocks[blockSize:]
+    }
+    return false
 }
