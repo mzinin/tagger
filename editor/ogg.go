@@ -10,8 +10,8 @@ import (
 )
 
 const (
-    oggPageHeaderSize int = 27
     oggPageMagic string = "OggS"
+    oggPageHeaderSize int = 27
     oggHeaderMagic = "vorbis"
     headerTypeContinue byte = 1
     maxFrameDataSize int = 65025 // 65307 - 282
@@ -27,12 +27,12 @@ func (editor *OggTagEditor) ReadTag(path string) (Tag, error) {
         return Tag{}, err
     }
 
-    _, commentPages, _ := splitFileData(editor.file)
+    _, commentPages, _ := editor.splitFileData(editor.file)
     if len(commentPages) == 0 {
         return Tag{}, errors.New("no tag")
     }
 
-    _, tagData, _ := splitCommentPages(commentPages)
+    _, tagData, _ := editor.splitCommentPages(commentPages)
 
     var tag Tag
     return tag, parseVorbisTags(tagData, &tag)
@@ -44,8 +44,8 @@ func (editor *OggTagEditor) WriteTag(src, dst string, tag Tag) error {
         return err
     }
 
-    idPage, commentPages, restData := splitFileData(editor.file)
-    newCommentPages, newSetupPages, numberOfPages := makeNewPages(commentPages, tag)
+    idPage, commentPages, restData := editor.splitFileData(editor.file)
+    newCommentPages, newSetupPages, numberOfPages := editor.makeNewPages(commentPages, tag)
 
     newPrefix := make([]byte, len(idPage) + len(newCommentPages) + len(newSetupPages))
     copy(newPrefix, idPage)
@@ -56,11 +56,11 @@ func (editor *OggTagEditor) WriteTag(src, dst string, tag Tag) error {
     sequence := numberOfPages + 1
     data := restData
     for len(data) > oggPageHeaderSize {
-        pageSize := getPageSize(data)
+        pageSize := editor.getPageSize(data)
 
         utils.WriteInt32Le(sequence, data[18:22]) // number
         utils.WriteUint32Le(0, data[22:26]) // zero CRC
-        utils.WriteUint32Le(oggCRC(data[:pageSize]), data[22:26]) // CRC
+        utils.WriteUint32Le(editor.crc(data[:pageSize]), data[22:26]) // CRC
 
         sequence++
         data = data[pageSize:]
@@ -75,25 +75,25 @@ func (editor *OggTagEditor) readFile(path string) error {
     return err
 }
 
-func splitFileData(data []byte) ([]byte, []byte, []byte) {
-    firstPageSize := getPageSize(data)
-    secondPageSize := getPageSize(data[firstPageSize:])
+func (editor *OggTagEditor) splitFileData(data []byte) ([]byte, []byte, []byte) {
+    firstPageSize := editor.getPageSize(data)
+    secondPageSize := editor.getPageSize(data[firstPageSize:])
 
     for secondPageSize >= oggPageHeaderSize && data[firstPageSize + 5] & headerTypeContinue != 0 {
         firstPageSize += secondPageSize
-        secondPageSize = getPageSize(data[firstPageSize:])
+        secondPageSize = editor.getPageSize(data[firstPageSize:])
     }
 
-    thirdPageSize := getPageSize(data[firstPageSize + secondPageSize:])
+    thirdPageSize := editor.getPageSize(data[firstPageSize + secondPageSize:])
     for thirdPageSize >= oggPageHeaderSize && data[firstPageSize + secondPageSize + 5] & headerTypeContinue != 0 {
         secondPageSize += thirdPageSize
-        thirdPageSize = getPageSize(data[firstPageSize + secondPageSize:])
+        thirdPageSize = editor.getPageSize(data[firstPageSize + secondPageSize:])
     }
 
     return data[:firstPageSize], data[firstPageSize : firstPageSize + secondPageSize], data[firstPageSize + secondPageSize:]
 }
 
-func getPageSize(page []byte) int {
+func (editor *OggTagEditor) getPageSize(page []byte) int {
     if len(page) < oggPageHeaderSize {
         return 0
     }
@@ -115,7 +115,7 @@ func getPageSize(page []byte) int {
     return headerSize + pageSegmentsSize
 }
 
-func splitCommentPages(pages []byte) ([]byte, []byte, []byte) {
+func (editor *OggTagEditor) splitCommentPages(pages []byte) ([]byte, []byte, []byte) {
     var commentHeader []byte = nil
     var tagData []byte = nil
     var setupHeader []byte = nil
@@ -136,7 +136,7 @@ func splitCommentPages(pages []byte) ([]byte, []byte, []byte) {
             pageHeaderSize += 5 + len(oggHeaderMagic) + commentHeaderSize
         }
 
-        pageSize := getPageSize(pages)
+        pageSize := editor.getPageSize(pages)
         tagData = append(tagData, pages[pageHeaderSize : pageSize] ...)
         pages = pages[pageSize:]
     }
@@ -150,14 +150,14 @@ func splitCommentPages(pages []byte) ([]byte, []byte, []byte) {
     return commentHeader, tagData, setupHeader
 }
 
-func makeNewPages(existingCommentPages []byte, tag Tag) ([]byte, []byte, int) {
+func (editor *OggTagEditor) makeNewPages(existingCommentPages []byte, tag Tag) ([]byte, []byte, int) {
     // bitstream number
     var bitstream int = 31013
     if len(existingCommentPages) > oggPageHeaderSize {
         bitstream = utils.ReadInt32Le(existingCommentPages[14 : 18])
     }
 
-    commentHeader, existingTagData, setupHeader := splitCommentPages(existingCommentPages)
+    commentHeader, existingTagData, setupHeader := editor.splitCommentPages(existingCommentPages)
     if len(commentHeader) == 0 {
         commentHeader = make([]byte, 1 + len(oggHeaderMagic) + 4)
         commentHeader[0] = 3
@@ -175,13 +175,13 @@ func makeNewPages(existingCommentPages []byte, tag Tag) ([]byte, []byte, int) {
     copy(tagData[len(commentHeader) + 4 + len(newTagData):], unsupportedTagData)
     tagData[len(tagData) - 1] = 1
 
-    newCommentHeader, commentPages := packTagsToOggFrame(bitstream, 1, tagData)
-    newSetupHeader, setupPages := packTagsToOggFrame(bitstream, commentPages + 1, setupHeader)
+    newCommentHeader, commentPages := editor.packTagDataIntoFrames(bitstream, 1, tagData)
+    newSetupHeader, setupPages := editor.packTagDataIntoFrames(bitstream, commentPages + 1, setupHeader)
 
     return newCommentHeader, newSetupHeader, commentPages + setupPages
 }
 
-func packTagsToOggFrame(bitstream, sequence int, tagData []byte) ([]byte, int) {
+func (editor *OggTagEditor) packTagDataIntoFrames(bitstream, sequence int, tagData []byte) ([]byte, int) {
     totalTagSize := len(tagData)
     if totalTagSize == 0 {
         return nil, 0
@@ -194,7 +194,7 @@ func packTagsToOggFrame(bitstream, sequence int, tagData []byte) ([]byte, int) {
     result := make([]byte, totalTagSize + 282 * (totalTagSize / maxFrameDataSize + 1))
 
     for tagSize < totalTagSize {
-        headerSize, dataSize := writeSingleOggHeader(result[size:], bitstream, sequence + pages, totalTagSize - tagSize)
+        headerSize, dataSize := editor.fillHeader(result[size:], bitstream, sequence + pages, totalTagSize - tagSize)
         pages++
         if tagSize != 0 {
             result[size + len(oggPageMagic) + 1] = headerTypeContinue
@@ -206,14 +206,14 @@ func packTagsToOggFrame(bitstream, sequence int, tagData []byte) ([]byte, int) {
         tagSize += dataSize
         tagData = tagData[dataSize:]
 
-        checksum := oggCRC(result[size - headerSize - dataSize : size])
+        checksum := editor.crc(result[size - headerSize - dataSize : size])
         utils.WriteUint32Le(checksum, result[size - headerSize - dataSize + 22 : size - headerSize - dataSize + 26])
     }
 
     return result[:size], pages
 }
 
-func writeSingleOggHeader(dst []byte, bitstream, sequence, totalSize int) (int, int) {
+func (editor *OggTagEditor) fillHeader(dst []byte, bitstream, sequence, totalSize int) (int, int) {
     copy(dst[0:4], oggPageMagic) // magic
     dst[4] = 0 // version
     dst[5] = 0 // header type
@@ -253,7 +253,7 @@ func writeSingleOggHeader(dst []byte, bitstream, sequence, totalSize int) (int, 
     return headerSize, dataSize
 }
 
-func oggCRC(data []byte) uint32 {
+func (editor *OggTagEditor) crc(data []byte) uint32 {
     var crc uint32 = 0
     for i := range data {
         crc = oggCrcTable[byte(crc>>24) ^ data[i]] ^ (crc << 8)
@@ -261,7 +261,7 @@ func oggCRC(data []byte) uint32 {
     return crc
 }
 
-var oggCrcTable = []uint32{
+var oggCrcTable = []uint32 {
 	0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9,	0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
 	0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61,	0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
 	0x4c11db70, 0x48d0c6c7, 0x4593e01e, 0x4152fda9,	0x5f15adac, 0x5bd4b01b, 0x569796c2, 0x52568b75,

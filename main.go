@@ -12,25 +12,66 @@ import (
 )
 
 func main() {
-    var path string
+    var result bool
+
     if len(os.Args) > 1 {
-        path = os.Args[1]
+        result = testOnCustomFile(os.Args[1])
     } else {
-        path = "D:\\projects\\Go\\bin\\loser.flac"
+        mp3Result := testTagReadWrite(editor.Mp3, "barefoot.mp3")
+        oggResult := testTagReadWrite(editor.Ogg, "barefoot.ogg")
+        flacResult := testTagReadWrite(editor.Flac, "loser.flac")
+        result = mp3Result && oggResult && flacResult
+    }
+
+    if result {
+        fmt.Println("OK")
+    } else {
+        fmt.Println("FAILED!!!")
+    }
+}
+
+func testOnCustomFile(path string) bool {
+    var tagType editor.EditorType
+    switch filepath.Ext(path) {
+    case ".mp3":
+        tagType = editor.Mp3
+    case ".ogg":
+        tagType = editor.Ogg
+    case ".flac":
+        tagType = editor.Flac
+    }
+
+    return testTagReadWrite(tagType, path);
+}
+
+func testTagReadWrite(tagType editor.EditorType, path string) bool {
+    // convert type into string
+    var typeString string
+    switch tagType {
+    case editor.Mp3:
+        typeString = "mp3"
+    case editor.Ogg:
+        typeString = "ogg"
+    case editor.Flac:
+        typeString = "flac"
     }
 
     // read tag
-    editorObject := editor.NewEditor(editor.Flac)
+    editorObject := editor.NewEditor(tagType)
     tag, err := editorObject.ReadTag(path)
     if err != nil {
         log.Fatal(err)
-        return
+        return false
     }
-    
+
     // print tag
-    fmt.Println("File: ", path)
-    fmt.Println(tag)
-    save(tag.Cover, "read_cover.jpg")
+    fmt.Println(typeString + " file: ", path)
+    fmt.Println(tag, "\n")
+    err = saveCover(tag.Cover, "read_cover_" + typeString)
+    if err != nil {
+        log.Fatal(err)
+        return false
+    }
 
     // make new tag
     var newTag editor.Tag
@@ -46,14 +87,16 @@ func main() {
     newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\comix_15.jpg")
 
     // write new tag
-    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new.flac", newTag)
+    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new." + typeString, newTag)
     if err != nil {
         log.Fatal(err)
-        return
+        return false
     }
+
+    return true
 }
 
-func save(cover editor.Cover, path string) error {
+func saveCover(cover editor.Cover, path string) error {
     extension := ""
     if strings.Contains(cover.Mime, "jpg") || strings.Contains(cover.Mime, "jpeg") {
         extension = ".jpg"
@@ -61,7 +104,5 @@ func save(cover editor.Cover, path string) error {
         extension = ".png"
     }
 
-    filename := path[:len(path) - len(filepath.Ext(path))] + extension
-
-    return ioutil.WriteFile(filename, cover.Data, os.ModePerm)
+    return ioutil.WriteFile(path + extension, cover.Data, os.ModePerm)
 }
