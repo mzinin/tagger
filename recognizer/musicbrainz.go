@@ -46,7 +46,7 @@ func UpdateTag(tag editor.Tag, path string, strategy ... UpdateStrategyType) (ed
         tag.Cover = newTag.Cover
         return tag, nil
     }
-        
+
     newTag.MergeWith(tag)
     return newTag, nil
 }

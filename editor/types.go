@@ -29,14 +29,19 @@ func (tag Tag) String() string {
 }
 
 func (tag Tag) Size() int {
-    return len(tag.Title) +
-           len(tag.Artist) +
-           len(tag.Album) +
-           int(math.Log10(float64(tag.Track))) +
-           int(math.Log10(float64(tag.Year))) + 
-           len(tag.Comment) +
-           len(tag.Genre) +
-           tag.Cover.Size()
+    size := len(tag.Title) +
+            len(tag.Artist) +
+            len(tag.Album) +
+            len(tag.Comment) +
+            len(tag.Genre) +
+            tag.Cover.Size()
+    if tag.Track != 0 {
+        size += int(math.Log10(float64(tag.Track)))
+    }
+    if tag.Year != 0 {
+        size += int(math.Log10(float64(tag.Year)))
+    }
+    return size
 }
 
 func (tag Tag) Empty() bool {
