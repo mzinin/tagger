@@ -9,17 +9,27 @@ import (
     "strings"
 
     "github.com/mzinin/tagger/editor"
+    "github.com/mzinin/tagger/recognizer"
 )
 
 func main() {
     var result bool
 
+    //if len(os.Args) > 1 {
+    //    result = testTagReadWrite(getType(os.Args[1]), os.Args[1])
+    //} else {
+    //    mp3Result := testTagReadWrite(editor.Mp3, "barefoot.mp3")
+    //    oggResult := testTagReadWrite(editor.Ogg, "barefoot.ogg")
+    //    flacResult := testTagReadWrite(editor.Flac, "loser.flac")
+    //    result = mp3Result && oggResult && flacResult
+    //}
+
     if len(os.Args) > 1 {
-        result = testOnCustomFile(os.Args[1])
+        result = testUpdateTag(getType(os.Args[1]), os.Args[1])
     } else {
-        mp3Result := testTagReadWrite(editor.Mp3, "barefoot.mp3")
-        oggResult := testTagReadWrite(editor.Ogg, "barefoot.ogg")
-        flacResult := testTagReadWrite(editor.Flac, "loser.flac")
+        mp3Result := testUpdateTag(editor.Mp3, "barefoot.mp3")
+        oggResult := testUpdateTag(editor.Ogg, "балалайка.ogg")
+        flacResult := testUpdateTag(editor.Flac, "loser.flac")
         result = mp3Result && oggResult && flacResult
     }
 
@@ -30,18 +40,16 @@ func main() {
     }
 }
 
-func testOnCustomFile(path string) bool {
-    var tagType editor.EditorType
+func getType(path string) editor.EditorType {
     switch filepath.Ext(path) {
     case ".mp3":
-        tagType = editor.Mp3
+        return editor.Mp3
     case ".ogg":
-        tagType = editor.Ogg
+        return editor.Ogg
     case ".flac":
-        tagType = editor.Flac
+        return editor.Flac
     }
-
-    return testTagReadWrite(tagType, path);
+    return editor.Mp3
 }
 
 func testTagReadWrite(tagType editor.EditorType, path string) bool {
@@ -85,6 +93,46 @@ func testTagReadWrite(tagType editor.EditorType, path string) bool {
     newTag.Cover.Mime = "image/jpg"
     newTag.Cover.Description = "a bit of description"
     newTag.Cover.Data, err = ioutil.ReadFile("D:\\Downloads\\comix_15.jpg")
+
+    // write new tag
+    err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new." + typeString, newTag)
+    if err != nil {
+        log.Fatal(err)
+        return false
+    }
+
+    return true
+}
+
+func testUpdateTag(tagType editor.EditorType, path string) bool {
+    // convert type into string
+    var typeString string
+    switch tagType {
+    case editor.Mp3:
+        typeString = "mp3"
+    case editor.Ogg:
+        typeString = "ogg"
+    case editor.Flac:
+        typeString = "flac"
+    }
+
+    // read tag
+    editorObject := editor.NewEditor(tagType)
+    tag, err := editorObject.ReadTag(path)
+    if err != nil {
+        log.Fatal(err)
+        return false
+    }
+
+    // get new tag
+    var newTag editor.Tag
+    newTag, err = recognizer.UpdateTag(tag, path, recognizer.Always)
+    if err != nil {
+        log.Fatal(err)
+        return false
+    }
+
+    saveCover(newTag.Cover, "new_cover_" + typeString)
 
     // write new tag
     err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new." + typeString, newTag)
