@@ -41,7 +41,7 @@ func UpdateTag(tag editor.Tag, path string, strategy ... UpdateStrategyType) (ed
 
     newTag, err := Recognize(path)
     if err != nil {
-        return tag, nil
+        return tag, err
     }
 
     if newTag.Empty() {
