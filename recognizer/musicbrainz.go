@@ -10,6 +10,7 @@ import (
     "strconv"
 
     "github.com/mzinin/tagger/editor"
+    "github.com/mzinin/tagger/utils"
 )
 
 type UpdateStrategyType int
@@ -34,12 +35,19 @@ func UpdateTag(tag editor.Tag, path string, strategy ... UpdateStrategyType) (ed
     }
 
     if !needUpdate(tag, s) {
+        utils.Log(utils.INFO, "recognizer.UpdateTag: tags of '%v' do not need update", path)
         return tag, nil
     }
 
     newTag, err := Recognize(path)
     if err != nil {
         return tag, nil
+    }
+
+    if newTag.Empty() {
+        utils.Log(utils.INFO, "recognizer.UpdateTag: no new tag found for '%v'", path)
+    } else if newTag.Cover.Empty() {
+        utils.Log(utils.INFO, "recognizer.UpdateTag: no cover art found for '%v'", path)
     }
 
     if s == IfNoCover {

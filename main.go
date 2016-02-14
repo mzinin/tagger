@@ -145,6 +145,10 @@ func testUpdateTag(tagType editor.EditorType, path string) bool {
 }
 
 func saveCover(cover editor.Cover, path string) error {
+    if len(cover.Data) == 0 {
+        return nil
+    }
+
     extension := ""
     if strings.Contains(cover.Mime, "jpg") || strings.Contains(cover.Mime, "jpeg") {
         extension = ".jpg"
