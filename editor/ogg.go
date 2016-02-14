@@ -4,7 +4,6 @@ import (
     "bytes"
     "errors"
     "io/ioutil"
-    "os"
 
     "github.com/mzinin/tagger/utils"
 )
@@ -66,7 +65,7 @@ func (editor *OggTagEditor) WriteTag(src, dst string, tag Tag) error {
         data = data[pageSize:]
     }
 
-    return ioutil.WriteFile(dst, append(newPrefix, restData ...), os.ModePerm)
+    return ioutil.WriteFile(dst, append(newPrefix, restData ...), 0666)
 }
 
 func (editor *OggTagEditor) readFile(path string) error {

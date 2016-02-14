@@ -3,7 +3,6 @@ package editor
 import (
     "errors"
     "io/ioutil"
-    "os"
 
     "github.com/mzinin/tagger/utils"
 )
@@ -65,7 +64,7 @@ func (editor *FlacTagEditor) WriteTag(src, dst string, tag Tag) error {
     copy(newData[len(prefix) + len(newCommentBlock) + len(newPictureBlock):], infix)
     copy(newData[len(prefix) + len(newCommentBlock) + len(newPictureBlock) + len(infix):], suffix)
 
-    return ioutil.WriteFile(dst, newData, os.ModePerm)
+    return ioutil.WriteFile(dst, newData, 0666)
 }
 
 func (editor *FlacTagEditor) readFile(path string) error {

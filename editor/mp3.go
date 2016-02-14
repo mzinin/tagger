@@ -4,7 +4,6 @@ import (
     "bytes"
     "errors"
     "io/ioutil"
-    "os"
     "strconv"
     "strings"
 
@@ -55,7 +54,7 @@ func (editor *Mp3TagEditor) WriteTag(src, dst string, tag Tag) error {
     _, existingTagData, _, soundData := editor.splitFileData(editor.file)
 
     newTagData := editor.makeNewID3v23TagData(existingTagData, tag)
-    return ioutil.WriteFile(dst, append(newTagData, soundData ...), os.ModePerm)
+    return ioutil.WriteFile(dst, append(newTagData, soundData ...), 0666)
 }
 
 func (editor *Mp3TagEditor) readFile(path string) error {
