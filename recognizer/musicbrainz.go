@@ -96,14 +96,12 @@ func lookupByFingerPrint(fingetPrint string, duration int) (string, error) {
     request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
     request.Header.Add("Content-Encoding", "gzip")
 
-    var response *http.Response
-    response, err = (&http.Client{}).Do(request)
+    response, err := (&http.Client{}).Do(request)
     if err != nil {
         return "", err
     }
 
-    var reply []byte
-    reply, err = ioutil.ReadAll(response.Body)
+    reply, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil {
 		return "", err
@@ -189,8 +187,7 @@ func askCoverArtArchive(releaseId string) editor.Cover {
         return editor.Cover{}
     }
 
-    var reply []byte
-    reply, err = ioutil.ReadAll(response.Body)
+    reply, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil {
 		return editor.Cover{}

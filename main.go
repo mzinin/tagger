@@ -125,14 +125,11 @@ func testUpdateTag(tagType editor.EditorType, path string) bool {
     }
 
     // get new tag
-    var newTag editor.Tag
-    newTag, err = recognizer.UpdateTag(tag, path, recognizer.Always)
+    newTag, err := recognizer.UpdateTag(tag, path, recognizer.Always)
     if err != nil {
         log.Fatal(err)
         return false
     }
-
-    saveCover(newTag.Cover, "new_cover_" + typeString)
 
     // write new tag
     err = editorObject.WriteTag(path, "D:\\projects\\Go\\bin\\new." + typeString, newTag)
