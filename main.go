@@ -12,6 +12,10 @@ import (
     "github.com/mzinin/tagger/recognizer"
 )
 
+var (
+    version string
+)
+
 func main() {
     var result bool
 
