@@ -23,15 +23,15 @@
 	{
 		"Comments": "",
 		"CompanyName": "",
-		"FileDescription": "",
+		"FileDescription": "Go Music Tagger",
 		"FileVersion": "v0.0.1.0",
 		"InternalName": "tagger.exe",
 		"LegalCopyright": "Mikhail Zinin",
 		"LegalTrademarks": "",
-		"OriginalFilename": "",
+		"OriginalFilename": "tagger.exe",
 		"PrivateBuild": "",
 		"ProductName": "Go Music Tagger",
-		"ProductVersion": "",
+		"ProductVersion": "v0.0.1.0",
 		"SpecialBuild": ""
 	},
 	"VarFileInfo":
