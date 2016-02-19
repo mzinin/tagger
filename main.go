@@ -7,6 +7,8 @@ import (
     "path/filepath"
     "os"
     "strings"
+    "sync"
+    "time"
 
     "github.com/mzinin/tagger/editor"
     "github.com/mzinin/tagger/recognizer"
@@ -28,14 +30,38 @@ func main() {
     //    result = mp3Result && oggResult && flacResult
     //}
 
+    start := time.Now()
+
     if len(os.Args) > 1 {
         result = testUpdateTag(getType(os.Args[1]), os.Args[1])
     } else {
-        mp3Result := testUpdateTag(editor.Mp3, "barefoot.mp3")
-        oggResult := testUpdateTag(editor.Ogg, "балалайка.ogg")
-        flacResult := testUpdateTag(editor.Flac, "loser.flac")
+        var wg sync.WaitGroup
+        wg.Add(3)
+        channel := make(chan bool, 3)
+
+        go func() {
+            defer wg.Done()
+            channel <- testUpdateTag(editor.Mp3, "barefoot.mp3")
+        } ()
+
+        go func() {
+            defer wg.Done()
+            channel <- testUpdateTag(editor.Ogg, "barefoot.ogg")
+        } ()
+
+        go func() {
+            defer wg.Done()
+            channel <- testUpdateTag(editor.Flac, "loser.flac")
+        } ()
+
+        wg.Wait()
+
+        mp3Result, oggResult, flacResult := <- channel, <- channel, <- channel
         result = mp3Result && oggResult && flacResult
     }
+
+    duration := time.Now().Sub(start)
+    fmt.Println("Total time: ", duration)
 
     if result {
         fmt.Println("OK")

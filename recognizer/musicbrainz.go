@@ -8,6 +8,8 @@ import (
     "net/http"
     "path/filepath"
     "strconv"
+    "sync"
+    "time"
 
     "github.com/mzinin/tagger/editor"
     "github.com/mzinin/tagger/utils"
@@ -26,6 +28,12 @@ const (
 
 const (
     appKey string = "jouNIpYIoz"
+    musizBrainzDelay time.Duration = 350 * time.Millisecond
+)
+
+var (
+    musicBrainzMutex sync.Mutex
+    lastMusicBrainzRequestTime time.Time = time.Unix(0, 0)
 )
 
 func UpdateTag(tag editor.Tag, path string, strategy ... UpdateStrategyType) (editor.Tag, error) {
@@ -69,6 +77,8 @@ func Recognize(path string) (editor.Tag, error) {
 }
 
 func askMusicBrainz(fingerPrint string, duration int) (editor.Tag, error) {
+    waitIfNeeded()
+
     reply, err := lookupByFingerPrint(fingerPrint, duration)
     if err != nil {
         return editor.Tag{}, err
@@ -80,6 +90,18 @@ func askMusicBrainz(fingerPrint string, duration int) (editor.Tag, error) {
     }
 
     return tag, nil
+}
+
+func waitIfNeeded() {
+    musicBrainzMutex.Lock()
+    defer musicBrainzMutex.Unlock()
+
+    sinceLastRequest := time.Now().Sub(lastMusicBrainzRequestTime)
+    if sinceLastRequest < musizBrainzDelay {
+        time.Sleep(musizBrainzDelay - sinceLastRequest)
+    }
+
+    lastMusicBrainzRequestTime = time.Now()
 }
 
 func lookupByFingerPrint(fingetPrint string, duration int) (string, error) {
