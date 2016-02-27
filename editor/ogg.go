@@ -2,7 +2,6 @@ package editor
 
 import (
     "bytes"
-    "errors"
     "io/ioutil"
 
     "github.com/mzinin/tagger/utils"
@@ -28,7 +27,7 @@ func (editor *OggTagEditor) ReadTag(path string) (Tag, error) {
 
     _, commentPages, _ := editor.splitFileData(editor.file)
     if len(commentPages) == 0 {
-        return Tag{}, errors.New("no tag")
+        return Tag{}, nil
     }
 
     _, tagData, _ := editor.splitCommentPages(commentPages)

@@ -31,10 +31,6 @@ func (editor *FlacTagEditor) ReadTag(path string) (Tag, error) {
     editor.parseCommentBlock(commentBlock, &tag)
     editor.parsePictureBlock(pictureBlock, &tag.Cover)
     
-    if tag.Empty() {
-        return Tag{}, errors.New("no tag")
-    }
-
     return tag, nil
 }
 

@@ -2,7 +2,6 @@ package editor
 
 import (
     "bytes"
-    "errors"
     "io/ioutil"
     "strconv"
     "strings"
@@ -34,10 +33,6 @@ func (editor *Mp3TagEditor) ReadTag(path string) (Tag, error) {
     tag10 := editor.parseID3v1Tag(tag10Data)
     tag23 := editor.parseID3v2Tag(tag23Data, 3)
     tag24 := editor.parseID3v2Tag(tag24Data, 4)
-
-    if tag10.Empty() && tag23.Empty() && tag24.Empty() {
-        return Tag{}, errors.New("no ID3 tag")
-    }
 
     tag23.MergeWith(tag24)
     tag23.MergeWith(tag10)
