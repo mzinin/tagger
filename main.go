@@ -31,7 +31,9 @@ func main() {
     }
 
     err = tagger.Run()
-    if err == nil {
-        tagger.PrintReport()
+    if err != nil {
+        log.Fatal(err)
+        return
     }
+    tagger.PrintReport()
 }
