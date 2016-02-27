@@ -1,6 +1,7 @@
 package editor
 
 import (
+    "bytes"
     "errors"
     "io/ioutil"
 
@@ -74,6 +75,11 @@ func (editor *FlacTagEditor) readFile(path string) error {
 }
 
 func (editor *FlacTagEditor) splitFileData() ([]byte, []byte, []byte, []byte, []byte) {
+    flacBeginning := bytes.Index(editor.file, []byte(flacHeaderMagic))
+    if flacBeginning != -1 {
+        editor.file = editor.file[flacBeginning:]
+    }
+    
     if len(editor.file) < 8 || string(editor.file[0:4]) != flacHeaderMagic {
         return nil, nil, nil, nil, nil
     }
