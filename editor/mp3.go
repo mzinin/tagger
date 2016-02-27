@@ -140,10 +140,10 @@ func (editor *Mp3TagEditor) parseID3v1Tag(data []byte) Tag {
     tag.Year, _ = strconv.Atoi(string(data[93:97]))
     switch data[125] {
     case 0:
-        tag.Comment = strings.Trim(string(data[97:125]), " ")
+        tag.Comment = strings.Trim(string(data[97:125]), " \0000")
         tag.Track = int(data[126])
     default:
-        tag.Comment = strings.Trim(string(data[97:127]), " ")
+        tag.Comment = strings.Trim(string(data[97:127]), " \0000")
     }
     tag.Genre = genreCodeToString[int(data[127])]
 
@@ -257,8 +257,8 @@ func (editor *Mp3TagEditor) makeNewID3v23TagData(existingTagData []byte, tag Tag
 }
 
 func (editor *Mp3TagEditor) serializeTag(tag Tag) []byte {
-    // 256 bytes for possible overhead
-    result := make([]byte, tag.Size() + 256)
+    // x2 for possible transform into UTF16, 256 bytes for possible overhead
+    result := make([]byte, 2 * tag.Size() + 256)
     size := 0
     
     if len(tag.Title) != 0 {
