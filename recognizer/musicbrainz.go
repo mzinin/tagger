@@ -12,18 +12,6 @@ import (
     "time"
 
     "github.com/mzinin/tagger/editor"
-    "github.com/mzinin/tagger/utils"
-)
-
-type UpdateStrategyType int
-
-const (
-    Always UpdateStrategyType = iota
-    IfEmpty
-    IfNoTitle
-    IfNoTitleArtist
-    IfNoTitleArtistAlbum
-    IfNoCover
 )
 
 const (
@@ -35,37 +23,6 @@ var (
     musicBrainzMutex sync.Mutex
     lastMusicBrainzRequestTime time.Time = time.Unix(0, 0)
 )
-
-func UpdateTag(tag editor.Tag, path string, strategy ... UpdateStrategyType) (editor.Tag, error) {
-    s := IfNoTitle
-    if len(strategy) > 0 {
-        s = strategy[0]
-    }
-
-    if !needUpdate(tag, s) {
-        utils.Log(utils.INFO, "recognizer.UpdateTag: tags of '%v' do not need update", path)
-        return tag, nil
-    }
-
-    newTag, err := Recognize(path)
-    if err != nil {
-        return tag, err
-    }
-
-    if newTag.Empty() {
-        utils.Log(utils.INFO, "recognizer.UpdateTag: no new tag found for '%v'", path)
-    } else if newTag.Cover.Empty() {
-        utils.Log(utils.INFO, "recognizer.UpdateTag: no cover art found for '%v'", path)
-    }
-
-    if s == IfNoCover {
-        tag.Cover = newTag.Cover
-        return tag, nil
-    }
-
-    newTag.MergeWith(tag)
-    return newTag, nil
-}
 
 func Recognize(path string) (editor.Tag, error) {
     fingerPrint, duration, err := getFingerPrint(path)
@@ -155,7 +112,7 @@ func parseAcousticIdReply(reply string) (editor.Tag, string) {
     if len(releases) == 0 {
         return editor.Tag{}, ""
     }
-    release := releases[0].(map[string]interface{})
+    release := getFirstRelease(releases)
 
     var tag editor.Tag
 
@@ -201,6 +158,27 @@ func parseAcousticIdReply(reply string) (editor.Tag, string) {
     }
 
     return tag, release["id"].(string)
+}
+
+func getFirstRelease(releases []interface{}) map[string]interface{} {
+    var year int = 9999
+    var index int = 0
+
+    for i, r := range releases {
+        release := r.(map[string]interface{})
+        if release["date"] == nil {
+            continue
+        }
+        date := release["date"].(map[string]interface{})
+        y := int(date["year"].(float64))
+
+        if y < year {
+            year = y
+            index = i
+        }
+    }
+
+    return releases[index].(map[string]interface{})
 }
 
 func askCoverArtArchive(releaseId string) editor.Cover {
@@ -283,20 +261,4 @@ func getCover(url string) editor.Cover {
     cover.Type = "Cover (front)"
 
     return cover
-}
-
-func needUpdate(tag editor.Tag, strategy UpdateStrategyType) bool {
-    switch strategy {
-    case Always:
-        return true
-    case IfNoTitle:
-        return len(tag.Title) == 0
-    case IfNoTitleArtist:
-        return len(tag.Title) == 0 && len(tag.Artist) == 0
-    case IfNoTitleArtistAlbum:
-        return len(tag.Title) == 0 && len(tag.Artist) == 0 && len(tag.Album) == 0
-    case IfNoCover:
-        return tag.Cover.Empty()
-    }
-    return false
 }
