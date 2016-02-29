@@ -33,7 +33,6 @@ func main() {
     err = tagger.Run()
     if err != nil {
         log.Fatal(err)
-        return
     }
     tagger.PrintReport()
 }

@@ -12,6 +12,7 @@ import (
     "time"
 
     "github.com/mzinin/tagger/editor"
+    "github.com/mzinin/tagger/utils"
 )
 
 const (
@@ -27,6 +28,7 @@ var (
 func Recognize(path string) (editor.Tag, error) {
     fingerPrint, duration, err := getFingerPrint(path)
     if err != nil {
+        utils.Log(utils.ERROR, "Failed to get finger print for file '%v': %v", path, err)
         return editor.Tag{}, err
     }
 
@@ -38,6 +40,7 @@ func askMusicBrainz(fingerPrint string, duration int) (editor.Tag, error) {
 
     reply, err := lookupByFingerPrint(fingerPrint, duration)
     if err != nil {
+        utils.Log(utils.ERROR, "Failed to lookup by finger print: %v", err)
         return editor.Tag{}, err
     }
 
@@ -70,6 +73,7 @@ func lookupByFingerPrint(fingetPrint string, duration int) (string, error) {
 
     request, err := http.NewRequest("POST", "http://api.acoustid.org/v2/lookup", bytes.NewReader(zippedData.Bytes()))
     if err != nil {
+        utils.Log(utils.ERROR, "Failed to make new http request: %v", err)
         return "", err
     }
     request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -77,12 +81,14 @@ func lookupByFingerPrint(fingetPrint string, duration int) (string, error) {
 
     response, err := (&http.Client{}).Do(request)
     if err != nil {
+        utils.Log(utils.ERROR, "Failed to send http request: %v", err)
         return "", err
     }
 
     reply, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil {
+        utils.Log(utils.ERROR, "Failed to read http response: %v", err)
 		return "", err
 	}
     return string(reply), nil
@@ -183,13 +189,18 @@ func getFirstRelease(releases []interface{}) map[string]interface{} {
 
 func askCoverArtArchive(releaseId string) editor.Cover {
     response, err := http.Get("http://coverartarchive.org/release/" + releaseId)
-    if err != nil || response.StatusCode != 200 {
+    if err != nil {
+        utils.Log(utils.ERROR, "Failed to send http request '%v' and get response: %v", "http://coverartarchive.org/release/" + releaseId, err)
+        return editor.Cover{}
+    }
+    if response.StatusCode != 200 {
         return editor.Cover{}
     }
 
     reply, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil {
+        utils.Log(utils.ERROR, "Failed to read http response: %v", err)
 		return editor.Cover{}
 	}
 
