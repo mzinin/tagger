@@ -4,38 +4,72 @@ import (
     "github.com/mzinin/tagger/logic"
     "github.com/mzinin/tagger/utils"
 
-    "flag"
-    "log"
+    "fmt"
+    "os"
+    "strings"
 )
 
 var (
     version string
     source string
-    destination string
-    filter string
+    destination string = ""
+    filter string = "NO_COVER"
 )
 
-func parseCommandLineArguments() {
-    flag.StringVar(&source, "s", ".", "input durectory or file")
-    flag.StringVar(&destination, "d", "", "output durectory or file, same as input by default")
-    flag.StringVar(&filter, "filter", "ALL", "file filter")
+func parseCommandLineArguments() bool {
+    if len(os.Args) < 2 {
+        return false
+    }
+    if len(os.Args) == 2 && os.Args[1][0] != '-' {
+        source = os.Args[1]
+        return true
+    }
 
-    flag.Parse()
+    i := 1
+    for i < len(os.Args) {
+        switch os.Args[i] {
+        case "-h", "--help":
+            return false
+        case "-s", "--source":
+            source = os.Args[i+1]
+            i += 2
+        case "-d", "--destination":
+            destination = os.Args[i+1]
+            i += 2
+        case "-f", "--filter":
+            filter = strings.ToUpper(os.Args[i+1])
+            i += 2
+        default:
+            fmt.Fprintf(os.Stderr, "Unexpected argument '%v'\n", os.Args[i])
+            return false
+        }
+    }
+    return true
+}
+
+func printUsage() {
+    fmt.Printf("Usage of %v %v:\n", os.Args[0], version)
+    fmt.Println("\t-h, --help          Print this message.")
+    fmt.Println("\t-s, --source        Input file or directory.")
+    fmt.Println("\t-d, --destination   Output file or directory, same as input by default.")
+    fmt.Println("\t-f, --filter        File filter: ALL | NO_TAG | NO_TITLE | NO_TITLE_ARTIST | NO_TITLE_ARTIST_ALBUM | NO_COVER. NO_COVER by default.")
 }
 
 func main() {
     utils.Log(utils.INFO, "Starting Go Music Tagger %v", version)
-    parseCommandLineArguments()
-    
-    tagger, err := logic.NewTagger(source, destination, filter)
-    if err != nil {
-        log.Fatal(err)
+    if !parseCommandLineArguments() {
+        printUsage()
         return
     }
 
-    err = tagger.Run()
+    tagger, err := logic.NewTagger(source, destination, filter)
     if err != nil {
-        log.Fatal(err)
+        fmt.Fprintln(os.Stderr, err)
+        return
+    }
+
+    if err = tagger.Run(); err != nil {
+        fmt.Fprintln(os.Stderr, err)
     }
     tagger.PrintReport()
 }
