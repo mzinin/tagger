@@ -7,6 +7,7 @@ import (
 
     "fmt"
     "os"
+    "os/signal"
     "path/filepath"
     "strings"
     "sync"
@@ -34,6 +35,7 @@ type Tagger struct {
     destination string
     filter FilterType
     counter *Counter
+    stop atomic.Value
 }
 
 func NewTagger(source, dest, filter string) (*Tagger, error) {
@@ -46,6 +48,7 @@ func NewTagger(source, dest, filter string) (*Tagger, error) {
 
 func (tagger *Tagger) Run() error {
     tagger.counter.start()
+    tagger.trapSignal()
 
     var err error
     if !tagger.sourceInfo.IsDir() {
@@ -127,6 +130,19 @@ func (tagger *Tagger) init(source, dest, filter string) error {
     return nil
 }
 
+func (tagger *Tagger) trapSignal() {
+    tagger.stop.Store(false)
+
+    ch := make(chan os.Signal, 1)
+    signal.Notify(ch, os.Interrupt)
+
+    go func() {
+        _ = <- ch
+        tagger.stop.Store(true)
+        utils.Log(utils.INFO, "Got signal to stop")
+    } ()
+}
+
 func (tagger *Tagger) processFile(src, dst string) error {
     utils.Log(utils.INFO, "Start processing file '%v'", src)
 
@@ -143,6 +159,11 @@ func (tagger *Tagger) processFile(src, dst string) error {
         return nil
     }
     tagger.counter.addFiltered()
+
+    if tagger.stop.Load().(bool) {
+        utils.Log(utils.WARNING, "Processing file '%v' interrupted by application stop", src)
+        return fmt.Errorf("Processing file '%v' interrupted by application stop", src)
+    }
 
     newTag, err := recognizer.Recognize(src)
     if err != nil {
@@ -233,10 +254,17 @@ func (tagger *Tagger) processDir(src, dst string) error {
         go func() {
             defer wg.Done()
             for {
+                if tagger.stop.Load().(bool) {
+                    utils.Log(utils.WARNING, "Processing directory '%v' interrupted by application stop", src)
+                    return
+                }
+
                 i := atomic.AddInt32(&index, 1)
                 if i >= int32(len(allFiles)) {
                     return
                 }
+
+                fmt.Printf("\rProcessing %v/%v", i, len(allFiles))
                 destination, err := tagger.getDestinationPath(allFiles[i])
                 if err != nil {
                     result.Store(err)
@@ -251,6 +279,7 @@ func (tagger *Tagger) processDir(src, dst string) error {
         } ()
     }
     wg.Wait()
+    fmt.Printf("\r                        \r")
 
     if result.Load() != nil {
         return result.Load().(error)
