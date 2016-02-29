@@ -2,6 +2,8 @@ package main
 
 import (
     "github.com/mzinin/tagger/logic"
+    "github.com/mzinin/tagger/utils"
+
     "flag"
     "log"
 )
@@ -22,6 +24,7 @@ func parseCommandLineArguments() {
 }
 
 func main() {
+    utils.Log(utils.INFO, "Starting Go Music Tagger %v", version)
     parseCommandLineArguments()
     
     tagger, err := logic.NewTagger(source, destination, filter)
