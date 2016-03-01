@@ -25,17 +25,17 @@ var (
     lastMusicBrainzRequestTime time.Time = time.Unix(0, 0)
 )
 
-func Recognize(path string) (editor.Tag, error) {
+func Recognize(path string, existingTag ... editor.Tag) (editor.Tag, error) {
     fingerPrint, duration, err := getFingerPrint(path)
     if err != nil {
         utils.Log(utils.ERROR, "Failed to get finger print for file '%v': %v", path, err)
         return editor.Tag{}, err
     }
 
-    return askMusicBrainz(fingerPrint, duration)
+    return askMusicBrainz(fingerPrint, duration, existingTag ...)
 }
 
-func askMusicBrainz(fingerPrint string, duration int) (editor.Tag, error) {
+func askMusicBrainz(fingerPrint string, duration int, existingTag ... editor.Tag) (editor.Tag, error) {
     waitIfNeeded()
 
     reply, err := lookupByFingerPrint(fingerPrint, duration)
@@ -44,7 +44,7 @@ func askMusicBrainz(fingerPrint string, duration int) (editor.Tag, error) {
         return editor.Tag{}, err
     }
 
-    tag, releaseId := parseAcousticIdReply(reply)
+    tag, releaseId := parseAcousticIdReply(reply, existingTag ...)
     if len(releaseId) > 0 {
         tag.Cover = askCoverArtArchive(releaseId)
     }
@@ -94,7 +94,7 @@ func lookupByFingerPrint(fingetPrint string, duration int) (string, error) {
     return string(reply), nil
 }
 
-func parseAcousticIdReply(reply string) (editor.Tag, string) {
+func parseAcousticIdReply(reply string, existingTag ... editor.Tag) (editor.Tag, string) {
     var fields map[string]interface{} 
     err := json.Unmarshal([]byte(reply), &fields)
 
@@ -118,73 +118,16 @@ func parseAcousticIdReply(reply string) (editor.Tag, string) {
     if len(releases) == 0 {
         return editor.Tag{}, ""
     }
-    release := getFirstRelease(releases)
+    release := pickRelease(releases, existingTag ...)
 
     var tag editor.Tag
-
-    if release["date"] != nil {
-        date := release["date"].(map[string]interface{})
-        tag.Year = int(date["year"].(float64))
-    }
-    
-    if release["artists"] != nil {
-        artists := release["artists"].([]interface{})
-        if len(artists) != 0 {
-            artist := artists[0].(map[string]interface{})
-            if artist["name"] != nil {
-                tag.Artist = artist["name"].(string)
-            }
-        }
-    }
-
-    if release["mediums"] != nil {
-        mediums := release["mediums"].([]interface{})
-        if len(mediums) != 0 {
-            medium := mediums[0].(map[string]interface{})
-
-            if medium["title"] != nil {
-                tag.Album = medium["title"].(string)
-            } else if release["title"] != nil {
-                tag.Album = release["title"].(string)
-            }
-
-            if  medium["tracks"] != nil {
-                tracks := medium["tracks"].([]interface{})
-                if len(tracks) != 0 {
-                    track := tracks[0].(map[string]interface{})
-                    if track["title"] != nil {
-                        tag.Title = track["title"].(string)
-                    }
-                    if track["position"] != nil {
-                        tag.Track = int(track["position"].(float64))
-                    }
-                }
-            }
-        }
-    }
+    tag.Year = getReleaseDate(release)
+    tag.Artist = getReleaseArtist(release)
+    tag.Album = getReleaseAlbum(release)
+    tag.Title = getReleaseTitle(release)
+    tag.Track = getReleaseTrack(release)
 
     return tag, release["id"].(string)
-}
-
-func getFirstRelease(releases []interface{}) map[string]interface{} {
-    var year int = 9999
-    var index int = 0
-
-    for i, r := range releases {
-        release := r.(map[string]interface{})
-        if release["date"] == nil {
-            continue
-        }
-        date := release["date"].(map[string]interface{})
-        y := int(date["year"].(float64))
-
-        if y < year {
-            year = y
-            index = i
-        }
-    }
-
-    return releases[index].(map[string]interface{})
 }
 
 func askCoverArtArchive(releaseId string) editor.Cover {

@@ -13,7 +13,7 @@ var (
     version string
     source string
     destination string = ""
-    filter string = "NO_COVER"
+    filter string = "ALL"
 )
 
 func parseCommandLineArguments() bool {

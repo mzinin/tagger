@@ -165,7 +165,7 @@ func (tagger *Tagger) processFile(src, dst string) error {
         return fmt.Errorf("Processing file '%v' interrupted by application stop", src)
     }
 
-    newTag, err := recognizer.Recognize(src)
+    newTag, err := recognizer.Recognize(src, tag)
     if err != nil {
         tagger.counter.addFail()
         utils.Log(utils.ERROR, "Failed to recognize composition from file '%v': %v", src, err)
