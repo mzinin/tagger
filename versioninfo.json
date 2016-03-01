@@ -4,13 +4,13 @@
 		"FileVersion": {
 			"Major": 0,
 			"Minor": 0,
-			"Patch": 2,
+			"Patch": 3,
 			"Build": 0
 		},
 		"ProductVersion": {
 			"Major": 0,
 			"Minor": 0,
-			"Patch": 2,
+			"Patch": 3,
 			"Build": 0
 		},
 		"FileFlagsMask": "3f",
@@ -24,14 +24,14 @@
 		"Comments": "",
 		"CompanyName": "",
 		"FileDescription": "Go Music Tagger",
-		"FileVersion": "v0.0.1.0",
+		"FileVersion": "v0.0.3.0",
 		"InternalName": "tagger.exe",
 		"LegalCopyright": "Mikhail Zinin",
 		"LegalTrademarks": "",
 		"OriginalFilename": "tagger.exe",
 		"PrivateBuild": "",
 		"ProductName": "Go Music Tagger",
-		"ProductVersion": "v0.0.1.0",
+		"ProductVersion": "v0.0.3.0",
 		"SpecialBuild": ""
 	},
 	"VarFileInfo":
