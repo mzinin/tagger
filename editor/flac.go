@@ -51,7 +51,11 @@ func (editor *FlacTagEditor) WriteTag(src, dst string, tag Tag) error {
     if editor.findAndRemoveLastMetaBlockFlag(commentBlock) ||
        editor.findAndRemoveLastMetaBlockFlag(pictureBlock) ||
        editor.findAndRemoveLastMetaBlockFlag(prefix[len(flacHeaderMagic):]) {
-        newPictureBlock[0] |= lastMetaBlockFlag
+        if len(newPictureBlock) > 0 {
+            newPictureBlock[0] |= lastMetaBlockFlag
+        } else if len(newCommentBlock) > 0 {
+            newCommentBlock[0] |= lastMetaBlockFlag
+        }
     }
 
     newData := make([]byte, len(prefix) + len(newCommentBlock) + len(newPictureBlock) + len(infix) + len(suffix))
@@ -201,6 +205,7 @@ func (editor *FlacTagEditor) makeNewPictureBlock(cover Cover) []byte {
 func (editor *FlacTagEditor) findAndRemoveLastMetaBlockFlag(blocks []byte) bool {
     for len(blocks) > 3 {
         if blocks[0] & lastMetaBlockFlag == lastMetaBlockFlag {
+            blocks[0] &= (^lastMetaBlockFlag)
             return true
         }
         blockSize := utils.ReadInt24Be(blocks[1:4]) + 4
