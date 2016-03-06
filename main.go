@@ -14,6 +14,7 @@ var (
     source string
     destination string = ""
     filter string = "ALL"
+    useExistingTag bool = true
 )
 
 func parseCommandLineArguments() bool {
@@ -39,6 +40,9 @@ func parseCommandLineArguments() bool {
         case "-f", "--filter":
             filter = strings.ToUpper(os.Args[i+1])
             i += 2
+        case "-n", "--no-existing-tag":
+            useExistingTag = false
+            i += 1
         default:
             fmt.Fprintf(os.Stderr, "Unexpected argument '%v'\n", os.Args[i])
             return false
@@ -49,10 +53,11 @@ func parseCommandLineArguments() bool {
 
 func printUsage() {
     fmt.Printf("Usage of %v %v:\n", os.Args[0], version)
-    fmt.Println("\t-h, --help          Print this message.")
-    fmt.Println("\t-s, --source        Input file or directory.")
-    fmt.Println("\t-d, --destination   Output file or directory, same as input by default.")
-    fmt.Println("\t-f, --filter        File filter: ALL | NO_TAG | NO_TITLE | NO_TITLE_ARTIST | NO_TITLE_ARTIST_ALBUM | NO_COVER. NO_COVER by default.")
+    fmt.Println("\t-h, --help             Print this message.")
+    fmt.Println("\t-s, --source           Input file or directory.")
+    fmt.Println("\t-d, --destination      Output file or directory, same as input by default.")
+    fmt.Println("\t-f, --filter           File filter: ALL | NO_TAG | NO_TITLE | NO_TITLE_ARTIST | NO_TITLE_ARTIST_ALBUM | NO_COVER. NO_COVER by default.")
+    fmt.Println("\t-n, --no-existing-tag  Do not use existing tags to choose recognized tag. False by default.")
 }
 
 func main() {
@@ -62,7 +67,7 @@ func main() {
         return
     }
 
-    tagger, err := logic.NewTagger(source, destination, filter)
+    tagger, err := logic.NewTagger(source, destination, filter, useExistingTag)
     if err != nil {
         fmt.Fprintln(os.Stderr, err)
         return

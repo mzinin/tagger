@@ -34,15 +34,17 @@ type Tagger struct {
     sourceInfo os.FileInfo
     destination string
     filter FilterType
+    useExistingTag bool
     counter *Counter
     stop atomic.Value
 }
 
-func NewTagger(source, dest, filter string) (*Tagger, error) {
+func NewTagger(source, dest, filter string, useTag bool) (*Tagger, error) {
     tagger := &Tagger{}
     if err := tagger.init(source, dest, filter); err != nil {
         return nil, err
     }
+    tagger.useExistingTag = useTag
     return tagger, nil
 }
 
@@ -165,7 +167,12 @@ func (tagger *Tagger) processFile(src, dst string) error {
         return fmt.Errorf("Processing file '%v' interrupted by application stop", src)
     }
 
-    newTag, err := recognizer.Recognize(src, tag)
+    var newTag editor.Tag
+    if tagger.useExistingTag {
+        newTag, err = recognizer.Recognize(src, tag)
+    } else {
+        newTag, err = recognizer.Recognize(src)
+    }
     if err != nil {
         tagger.counter.addFail()
         utils.Log(utils.ERROR, "Failed to recognize composition from file '%v': %v", src, err)
